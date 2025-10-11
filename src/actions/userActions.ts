@@ -1,40 +1,70 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { User } from "@prisma/client";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { ActionResult } from "@/types/actionTypes";
-import { createSuccessResult, createErrorResult } from "@/types/actionTypes";
+import { createSuccessResult, createErrorResult } from "@/lib/actionHelpers";
+import { createInboxFolder } from "./folderActions";
+import { auth, currentUser } from "@clerk/nextjs/server";
 
 /**
  * Gets the current authenticated user
- * If the user is not authenticated, returns null
+ * Creates the user if they don't exist in the database yet
  *
- * @returns The user object or null if not authenticated/not found
+ * @returns The user object or error
  */
-
 export async function getCurrentUser(): Promise<ActionResult<User>> {
   try {
-    // get the current authentication session from clerk
-    const { userId } = await auth();
-    if (!userId) {
-      logger.debug("User not authenticated");
+    // Get the current authentication session from clerk
+    const { userId: clerkUserId } = await auth();
+
+    if (!clerkUserId) {
       return createErrorResult("Not authenticated");
     }
-    // Find the user in our database based on Clerk ID
-    const user = await prisma.user.findUnique({
-      where: {
-        clerkId: userId,
-      },
+
+    // Try to find the user in our database
+    let user = await prisma.user.findUnique({
+      where: { clerkId: clerkUserId },
     });
+
+    // If user doesn't exist, create them (handles race condition with webhook)
     if (!user) {
       logger.debug(
-        { clerkId: userId },
-        "User with clerkId not found in database"
+        { clerkId: clerkUserId },
+        "User not found in database, fetching from Clerk to create"
       );
-      return createErrorResult("User not found");
+
+      // Fetch user details from Clerk
+      const clerkUser = await currentUser();
+
+      if (!clerkUser) {
+        return createErrorResult("User not found in Clerk");
+      }
+
+      const primaryEmail = clerkUser.emailAddresses.find(
+        (email) => email.id === clerkUser.primaryEmailAddressId
+      );
+
+      if (!primaryEmail) {
+        return createErrorResult("No primary email found");
+      }
+
+      // Create user (idempotent - won't fail if webhook already created it)
+      const createResult = await createUser(
+        clerkUserId,
+        primaryEmail.emailAddress,
+        clerkUser.firstName || undefined,
+        clerkUser.lastName || undefined
+      );
+
+      if (!createResult.success) {
+        return createErrorResult("Failed to create user");
+      }
+
+      user = createResult.data;
     }
+
     return createSuccessResult(user);
   } catch (error) {
     logger.error({ error }, "Error getting current user");
@@ -43,9 +73,10 @@ export async function getCurrentUser(): Promise<ActionResult<User>> {
 }
 
 /**
- * Creates a new user in the database and sends a welcome email
+ * Creates a new user in the database (idempotent - safe to call multiple times)
+ * If user already exists, returns the existing user
  *
- * @returns The user object or null if not authenticated/not found
+ * @returns The user object
  */
 
 export async function createUser(
@@ -55,6 +86,16 @@ export async function createUser(
   lastName?: string
 ): Promise<ActionResult<User>> {
   try {
+    // Try to find existing user first
+    const existingUser = await prisma.user.findUnique({
+      where: { clerkId },
+    });
+
+    if (existingUser) {
+      logger.debug({ userId: existingUser.id }, "User already exists");
+      return createSuccessResult(existingUser, "User already exists");
+    }
+
     const newUser = await prisma.user.create({
       data: {
         clerkId,
@@ -65,6 +106,14 @@ export async function createUser(
       },
     });
     logger.info({ userId: newUser.id }, "User created");
+    // Create inbox folder for new user
+    const inboxResult = await createInboxFolder(newUser.id);
+    if (!inboxResult.success) {
+      logger.error("Failed to create inbox folder:", {
+        userId: newUser.id,
+        error: inboxResult.error,
+      });
+    }
     // TODO: send welcome email
     return createSuccessResult(newUser, "User created successfully");
   } catch (error) {

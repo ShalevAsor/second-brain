@@ -1,0 +1,140 @@
+/* =====================
+   MATH POPOVER STYLES
+   ===================== */
+
+/* =====================
+   CARD CONTAINER
+   ===================== */
+.math-popover-card {
+  // Mobile overrides - remove shadow and border
+  &--mobile {
+    box-shadow: none;
+    border: 0;
+  }
+}
+
+.math-popover-body {
+  // Mobile overrides - remove padding
+  &--mobile {
+    padding: 0;
+  }
+}
+
+/* =====================
+   INPUT ROW
+   ===================== */
+.math-popover-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.math-popover-input-group {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* =====================
+   CHARACTER COUNTER
+   ===================== */
+.math-popover-char-counter {
+  font-size: 0.7rem;
+  color: #888;
+  padding: 0.25rem 0.5rem;
+  flex-shrink: 0;
+
+  &--over-limit {
+    color: #ef4444;
+  }
+}
+
+/* =====================
+   BUTTON GROUPS
+   ===================== */
+.math-popover-button-group {
+  flex-shrink: 0;
+}
+
+/* =====================
+   PREVIEW AREA
+   ===================== */
+.math-popover-preview {
+  padding: 0.5rem 1rem;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  background: rgba(0, 0, 0, 0.02); // Subtle background
+  border-radius: 0.25rem;
+  margin: 0.3rem 0;
+}
+
+.math-popover-preview-label {
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.math-popover-preview-content {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 400px;
+
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.5);
+    border-radius: 2px;
+  }
+}
+
+/* =====================
+   QUICK INSERT PANEL
+   ===================== */
+.math-popover-quick-insert {
+  margin-top: 0.5rem; // Spacing instead of separator
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.05); // Thin border instead of thick separator
+}
+.math-popover-quick-insert-toggle {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+}
+
+.math-popover-quick-insert-chevron {
+  transition: transform 0.2s;
+
+  &--open {
+    transform: rotate(180deg);
+  }
+}
+
+.math-popover-quick-insert-grid {
+  padding: 0.5rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+}
+
+.math-popover-quick-button {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* =====================
+   MOBILE SPECIFIC
+   ===================== */
+.math-popover-mobile-row {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  gap: 0.5rem;
+}

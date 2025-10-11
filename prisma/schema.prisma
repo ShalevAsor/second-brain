@@ -16,6 +16,87 @@ model User {
   lastName  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  notes     Note[]
+  folders   Folder[]
+  tags      Tag[]
   
   @@map("users")
+}
+
+model Note {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title            String
+  content          String    @db.Text
+  folderId         String?
+  folder           Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  tags             NoteTag[]
+  isAutoOrganized  Boolean   @default(false)
+  isFavorite       Boolean   @default(false)
+  aiSuggestions    Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([folderId])
+  @@index([userId,isFavorite])
+  @@map("notes")
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDefault Boolean   @default(false) // for inbox folder 
+  name      String
+  color     FolderColor @default(GRAY)
+  parentId  String?
+  parent    Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderHierarchy")
+  depth     Int      @default(0) // [0,1,2] depth allowed
+  notes     Note[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+  @@index([parentId])
+  @@index([userId, depth])
+  @@map("folders")
+}
+model Tag {
+  id        String    @id @default(cuid())
+  name      String    // Tag name (e.g., "python", "algorithms")
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     NoteTag[] // Notes that have this tag
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  @@unique([userId, name]) // Prevent duplicate tag names per user
+  @@index([userId])
+  @@map("tags")
+}
+
+model NoteTag {
+  noteId String
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@id([noteId, tagId]) // Composite primary key
+  @@index([noteId])
+  @@index([tagId])
+  @@map("note_tags")
+}
+
+
+enum FolderColor {
+  GRAY    // Default - neutral/unorganized
+  RED     // Urgent/important
+  GREEN   // In progress/active
+  BLUE    // Reference/documentation
+  YELLOW  // Review/pending
+  PURPLE  // Personal/special
 }

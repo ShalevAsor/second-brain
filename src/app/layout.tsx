@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import "@/styles/tiptap.css";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
+
+// import { ClerkProvider } from "@clerk/nextjs";
+// import { Toaster } from "@/components/ui/sonner";
+import { Providers } from "@/components/providers/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,15 +27,27 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // return (
+  //   // TODO: consider change the afterSignOutUrl to landing page or make home page public
+  //   <ClerkProvider afterSignOutUrl={"/sign-in"}>
+  //     <html lang="en">
+  //       <body
+  //         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+  //       >
+  //         {children}
+  //         <Toaster />
+  //       </body>
+  //     </html>
+  //   </ClerkProvider>
+  // );
   return (
-    <ClerkProvider afterSignOutUrl={"/"}>
-      <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    // TODO: consider change the afterSignOutUrl to landing page or make home page public
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <Providers>{children}</Providers>
+      </body>
+    </html>
   );
 }

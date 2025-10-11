@@ -1,110 +1,88 @@
 "use client";
 
 import * as React from "react";
-import { Home, Plus, Search, Star, Brain } from "lucide-react";
 import { User } from "@prisma/client";
 
-import { NavUser } from "@/components/sidebar/nav-user";
-import { NavFolders } from "@/components/sidebar/nav-folders";
-import { NavTags } from "@/components/sidebar/nav-tags";
+import { SidebarHeaderLogo } from "./sidebar-header-logo";
+import { NavUser } from "./user";
+import { NavQuickActions } from "./quick-actions";
+import { NavFolders } from "./folders";
+import { NavTags } from "./tags";
+import { NavFavorites } from "./favorites";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
 } from "@/components/ui/sidebar";
-import Link from "next/link";
 
+/**
+ * Props for AppSidebar
+ *
+ * Extends all props from the base Sidebar component,
+ * plus adds a required `user` prop.
+ *
+ * This allows passing through Sidebar props like:
+ * - collapsible: "icon" | "offcanvas" | "none"
+ * - className: string
+ * - side: "left" | "right"
+ * - variant: "sidebar" | "floating" | "inset"
+ *
+ * While also requiring our custom `user` data.
+ */
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user: User;
 }
 
+/**
+ * App Sidebar Component
+ *
+ * Main application sidebar containing navigation and organizational tools.
+ *
+ * Features:
+ * - User profile footer
+ * - Quick actions (Quick Capture, New Note, Search)
+ * - Folders section with hierarchy
+ * - Tags section
+ * - Favorites section
+ * - Collapsible with icon mode
+ *
+ * State Management:
+ * - Section open/closed state: Zustand (useSidebarUIStore)
+ * - Folder selection/expansion: Zustand (useFolderStore)
+ * - Folder data: React Query (useFolders)
+ * - Favorites data: React Query (useFavoriteNotes)
+ */
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" {...props}>
+      {/* Header with logo and app name */}
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href={"/"}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Brain className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Second Brain</span>
-                  <span className="truncate text-xs">STEM Notes</span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <SidebarHeaderLogo />
       </SidebarHeader>
 
+      {/* Main navigation content */}
       <SidebarContent>
-        {/* Quick Actions */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href={"/"}>
-                    <Home />
-                    <span>Home</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Plus />
-                  <span>Quick Capture</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Search />
-                  <span>Search</span>
-                  <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                    <span className="text-xs">⌘</span>K
-                  </kbd>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Quick Actions: Quick Capture, New Note, Search */}
+        <NavQuickActions />
 
-        {/* Folders */}
+        {/* Folders: Hierarchical folder structure */}
         <NavFolders />
 
-        {/* Tags */}
+        {/* Tags: Tag-based organization */}
         <NavTags />
 
-        {/* Favorites */}
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel>Favorites</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Star className="fill-yellow-500 text-yellow-500" />
-                  <span>Important formulas</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              {/* More favorites will be loaded from DB */}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Favorites: Starred notes */}
+        <NavFavorites />
       </SidebarContent>
 
+      {/* Footer with user profile */}
       <SidebarFooter>
         <NavUser user={user} />
       </SidebarFooter>
+
+      {/* Drag handle rail */}
       <SidebarRail />
     </Sidebar>
   );
