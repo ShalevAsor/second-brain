@@ -11,7 +11,7 @@ import { create } from "zustand";
  * Defines all possible modal types in the application.
  * This ensures type safety when opening modals throughout the app.
  */
-export type ModalType = "quickCapture" | "folderModal";
+export type ModalType = "quickCapture" | "folderModal" | "search";
 
 /**
  * Modal Store Interface

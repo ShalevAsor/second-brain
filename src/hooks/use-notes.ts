@@ -14,26 +14,19 @@ import type { NoteWithRelations } from "@/types/noteTypes";
 import type { CreateNoteInput, UpdateNoteInput } from "@/schemas/noteSchemas";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { FAVORITES_QUERY_KEY } from "./use-favorites";
-/*
-QUERY KEY CONSTANTS
-*/
-export const NOTES_QUERY_KEY = ["notes"] as const;
-export const ALL_NOTES_QUERY_KEY = ["notes", "all"] as const;
-
-// Query key factories
-export const noteKeys = {
-  all: () => ALL_NOTES_QUERY_KEY,
-  byFolder: (folderId: string) => ["notes", "folder", folderId] as const,
-  byTag: (tagId: string) => ["notes", "tag", tagId] as const,
-  detail: (noteId: string) => ["notes", noteId] as const,
-};
+import {
+  NOTES_QUERY_KEY,
+  FOLDERS_QUERY_KEY,
+  TAGS_QUERY_KEY,
+  FAVORITES_QUERY_KEY,
+  noteKeys,
+} from "@/lib/query-keys";
 
 /**
  * Hook to fetch all notes for the current user
  * Used in: Default /notes view
  */
-export function useAllNotes() {
+export function useAllNotes(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: noteKeys.all(),
     queryFn: async () => {
@@ -43,13 +36,17 @@ export function useAllNotes() {
       }
       return result.data;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 /**
  * Hook to fetch notes by folder ID
  * Used in: /notes?tag=xyz view
  */
-export function useNotesByFolder(folderId: string | null) {
+export function useNotesByFolder(
+  folderId: string | null,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: folderId
       ? noteKeys.byFolder(folderId)
@@ -62,7 +59,7 @@ export function useNotesByFolder(folderId: string | null) {
       }
       return result.data;
     },
-    enabled: !!folderId, // Only run query if folderId exists
+    enabled: (options?.enabled ?? true) && !!folderId, // Only run query if folderId exists
   });
 }
 
@@ -70,7 +67,10 @@ export function useNotesByFolder(folderId: string | null) {
  * Hook to fetch notes by tag ID
  * Used in: /notes?tag=xyz view
  */
-export function useNotesByTag(tagId: string | null) {
+export function useNotesByTag(
+  tagId: string | null,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: tagId ? noteKeys.byTag(tagId) : ["notes", "tag", null],
     queryFn: async () => {
@@ -82,7 +82,7 @@ export function useNotesByTag(tagId: string | null) {
       }
       return result.data;
     },
-    enabled: !!tagId, // Only run query if tagId exists
+    enabled: (options?.enabled ?? true) && !!tagId, // Only run query if tagId exists
   });
 }
 
@@ -160,19 +160,16 @@ export function useCreateNote() {
       // toast
       toast.error(error.message);
     },
-    onSuccess: () => {
-      // toast.success(
-      //   variables.title ? `"${variables.title}" created` : "Note created"
-      // );
-      // // Navigate to the new note
-      // if (data?.id) {
-      //   router.push(`/notes/${data.id}`);
-      // }
-    },
+    onSuccess: () => {},
 
-    onSettled: () => {
+    onSettled: (data) => {
       // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
+      if (data?.isFavorite) {
+        queryClient.invalidateQueries({ queryKey: FAVORITES_QUERY_KEY });
+      }
     },
   });
 }
@@ -205,13 +202,15 @@ export function useUpdateNote() {
       const previousAllNotes = queryClient.getQueryData<NoteWithRelations[]>(
         noteKeys.all()
       );
+      // Tags will be updated when server response comes back
+      const { tags, ...updateFields } = updatedNote;
 
       // Optimistically update single note cache
       queryClient.setQueryData<NoteWithRelations>(
         noteKeys.detail(noteId),
         (old) => {
           if (!old) return old;
-          return { ...old, ...updatedNote, updatedAt: new Date() };
+          return { ...old, ...updateFields, updatedAt: new Date() };
         }
       );
 
@@ -220,7 +219,7 @@ export function useUpdateNote() {
         if (!old) return old;
         return old.map((note) =>
           note.id === noteId
-            ? { ...note, ...updatedNote, updatedAt: new Date() }
+            ? { ...note, ...updateFields, updatedAt: new Date() }
             : note
         );
       });
@@ -252,9 +251,14 @@ export function useUpdateNote() {
     onSettled: (data) => {
       // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
-      if (data?.isFavorite) {
-        queryClient.invalidateQueries({ queryKey: FAVORITES_QUERY_KEY });
-      }
+      // - notes: Note content/metadata changed
+      // - tags: Tag counts may have changed if tags added/removed
+      // - folders: Folder counts may have changed if note moved between folders
+      // - favorites: Only if favorite status changed
+      queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: FAVORITES_QUERY_KEY });
     },
   });
 }
@@ -318,7 +322,9 @@ export function useDeleteNote() {
     onSettled: () => {
       // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+      queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: FAVORITES_QUERY_KEY });
     },
   });
 }

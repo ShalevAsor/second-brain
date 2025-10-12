@@ -17,18 +17,13 @@ import type {
   AddTagToNoteInput,
   RemoveTagFromNoteInput,
 } from "@/schemas/tagSchemas";
-
-/**
- * Query key for folders
- * Centralized to ensure consistency across the app
- */
-export const TAGS_QUERY_KEY = ["tags"] as const;
+import { TAGS_QUERY_KEY, NOTES_QUERY_KEY } from "@/lib/query-keys";
 
 /**
  * Hook to fetch all tags with note counts
  * Sorted by usage (most used first)
  */
-export function useTags() {
+export function useTags(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: TAGS_QUERY_KEY,
     queryFn: async () => {
@@ -38,6 +33,7 @@ export function useTags() {
       }
       return result.data;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -146,10 +142,9 @@ export function useUpdateTag() {
     onSuccess: (data) => {
       toast.success(`Tag renamed to "${data.name}"`);
     },
-    // TODO: use notes query key constants
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ["notes"] }); // Notes display tag names
+      queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
     },
   });
 }
@@ -199,8 +194,10 @@ export function useDeleteTag() {
     },
 
     onSettled: () => {
+      // - tags: Tag removed from sidebar
+      // - notes: Notes that had this tag no longer display it
       queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ["notes"] }); // Notes may have displayed this tag
+      queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
     },
   });
 }
@@ -231,7 +228,7 @@ export function useAddTagToNote() {
     onSettled: () => {
       // Invalidate both tags (counts changed) and notes (tags changed)
       queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
     },
   });
 }
@@ -262,26 +259,7 @@ export function useRemoveTagFromNote() {
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
     },
-  });
-}
-/**
- * Hook to fetch notes filtered by a specific tag
- * Used for /notes?tag=xyz view
- */
-export function useNotesByTag(tagId: string | null) {
-  return useQuery({
-    queryKey: ["notes", "by-tag", tagId],
-    queryFn: async () => {
-      if (!tagId) return [];
-
-      const result = await getNotesByTag({ tagId });
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      return result.data;
-    },
-    enabled: !!tagId, // Only run query if tagId exists
   });
 }

@@ -3,7 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toggleNoteFavorite, getFavoriteNotes } from "@/actions/noteActions";
 import { toast } from "sonner";
-import { NOTES_QUERY_KEY } from "./use-notes";
+import {
+  FAVORITES_QUERY_KEY,
+  NOTES_QUERY_KEY,
+  noteKeys,
+} from "@/lib/query-keys";
 import { NoteWithRelations } from "@/types/noteTypes";
 
 /**
@@ -20,12 +24,6 @@ type FavoriteNote = {
 };
 
 /**
- * Query key for favorites
- * Centralized to ensure consistency across the app
- */
-export const FAVORITES_QUERY_KEY = ["favorites"] as const;
-
-/**
  * Hook to fetch all favorite notes
  *
  * Uses React Query to cache results and automatically refetch when needed.
@@ -36,7 +34,7 @@ export const FAVORITES_QUERY_KEY = ["favorites"] as const;
  * @example
  * const { data: favorites, isLoading, error } = useFavoriteNotes();
  */
-export function useFavoriteNotes() {
+export function useFavoriteNotes(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: FAVORITES_QUERY_KEY,
     // function to fetches the data
@@ -48,6 +46,7 @@ export function useFavoriteNotes() {
       }
       return result.data;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -85,16 +84,14 @@ export function useToggleFavorite() {
       // Snapshot previous state
       const previousFavorites =
         queryClient.getQueryData<FavoriteNote[]>(FAVORITES_QUERY_KEY);
-      const previousNotes = queryClient.getQueryData<NoteWithRelations[]>([
-        "notes",
-        "all",
-      ]); // ⭐ Correct type
+      const previousNotes = queryClient.getQueryData<NoteWithRelations[]>(
+        noteKeys.all()
+      );
 
-      // ⭐ Get note data from the CORRECT query key with CORRECT type
-      const allNotes = queryClient.getQueryData<NoteWithRelations[]>([
-        "notes",
-        "all",
-      ]);
+      // Get note data from the all notes query
+      const allNotes = queryClient.getQueryData<NoteWithRelations[]>(
+        noteKeys.all()
+      );
       const noteData = allNotes?.find((n) => n.id === noteId);
 
       // Optimistically update favorites cache
@@ -123,8 +120,8 @@ export function useToggleFavorite() {
         return old;
       });
 
-      // ⭐ Optimistically update notes list (toggle isFavorite flag)
-      queryClient.setQueryData<NoteWithRelations[]>(["notes", "all"], (old) => {
+      // Optimistically update notes list (toggle isFavorite flag)
+      queryClient.setQueryData<NoteWithRelations[]>(noteKeys.all(), (old) => {
         if (!old) return old;
         return old.map((note) =>
           note.id === noteId ? { ...note, isFavorite: !note.isFavorite } : note
@@ -144,7 +141,7 @@ export function useToggleFavorite() {
       }
       if (context?.previousNotes) {
         queryClient.setQueryData<NoteWithRelations[]>(
-          ["notes", "all"],
+          noteKeys.all(),
           context.previousNotes
         );
       }

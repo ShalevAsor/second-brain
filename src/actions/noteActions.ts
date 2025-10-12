@@ -18,60 +18,135 @@ import { Prisma } from "@prisma/client";
 import { ActionResult } from "@/types/actionTypes";
 
 /**
- * Creates a new note
- * Note: Tags are now managed separately via tagActions (addTagToNote)
+ * Creates a new note with optional tags
+ * Tags are created/linked automatically in a transaction
  */
 export async function createNote(input: CreateNoteInput) {
   try {
-    // 1. Authenticate user
     const userId = await requireAuth();
-
-    // 2. Validate input
     const validated = createNoteSchema.parse(input);
 
-    // 3. Create note (without tags - they're managed separately now)
-    const note = await prisma.note.create({
-      data: {
-        title: validated.title,
-        content: validated.content,
-        folderId: validated.folderId ?? null,
-        isAutoOrganized: validated.isAutoOrganized ?? false,
-        aiSuggestions: validated.aiSuggestions ?? Prisma.JsonNull,
-        userId,
-      },
-      include: {
-        folder: true,
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-      },
-    });
+    console.log("📝 [Create Note] Creating note:");
+    console.log("   Title:", validated.title);
+    console.log("   Folder ID:", validated.folderId || "null");
+    console.log("   Tags:", validated.tags.join(", ") || "none");
+    console.log("   Auto-organized:", validated.isAutoOrganized);
 
-    // 4. Revalidate cache
+    const note = await prisma.$transaction(
+      async (tx) => {
+        // 1. Create the note first
+        const newNote = await tx.note.create({
+          data: {
+            title: validated.title,
+            content: validated.content,
+            folderId: validated.folderId ?? null,
+            isAutoOrganized: validated.isAutoOrganized ?? false,
+            aiSuggestions: validated.aiSuggestions ?? Prisma.JsonNull,
+            userId,
+          },
+        });
+
+        console.log("✅ [Create Note] Note created with ID:", newNote.id);
+
+        // 2. Handle tags if provided - PARALLEL PROCESSING
+        if (validated.tags && validated.tags.length > 0) {
+          console.log(
+            "🏷️  [Create Note] Processing",
+            validated.tags.length,
+            "tags..."
+          );
+
+          // ✅ FIX: Process all tags in parallel
+          await Promise.all(
+            validated.tags.map(async (tagName) => {
+              // Find or create tag
+              const tag = await tx.tag.upsert({
+                where: {
+                  userId_name: {
+                    userId,
+                    name: tagName,
+                  },
+                },
+                create: {
+                  name: tagName,
+                  userId,
+                },
+                update: {},
+              });
+
+              console.log(
+                "   Tag:",
+                tagName,
+                "→",
+                tag.id,
+                "(created or existing)"
+              );
+
+              // Link tag to note
+              await tx.noteTag.upsert({
+                where: {
+                  noteId_tagId: {
+                    noteId: newNote.id,
+                    tagId: tag.id,
+                  },
+                },
+                create: {
+                  noteId: newNote.id,
+                  tagId: tag.id,
+                },
+                update: {},
+              });
+            })
+          );
+
+          console.log("✅ [Create Note] All tags linked successfully");
+        }
+
+        // 3. Return note with full relations
+        return await tx.note.findUnique({
+          where: { id: newNote.id },
+          include: {
+            folder: true,
+            tags: {
+              include: {
+                tag: true,
+              },
+            },
+          },
+        });
+      },
+      {
+        maxWait: 10000, // ✅ Increase max wait time to 10 seconds
+        timeout: 15000, // ✅ Increase timeout to 15 seconds
+      }
+    );
+
+    console.log("✅ [Create Note] Complete! Note has:");
+    console.log("   Folder:", note?.folder?.name || "none");
+    console.log(
+      "   Tags:",
+      note?.tags.map((t) => t.tag.name).join(", ") || "none"
+    );
+
     revalidatePath("/");
 
     return createSuccessResult(note, "Note created successfully");
   } catch (error) {
+    console.error("❌ [Create Note] Error:", error);
     logger.error("Error creating note:", { error });
     return createErrorResult({ error });
   }
 }
 
 /**
- * Updates an existing note
- * Note: Tags are now managed separately via tagActions (addTagToNote/removeTagFromNote)
+ * Updates an existing note with optional tags
+ * If tags provided, replaces all existing tags with new set
  */
 export async function updateNote(input: UpdateNoteInput) {
   try {
-    // 1. Authenticate user
     const userId = await requireAuth();
-
-    // 2. Validate input
     const validated = updateNoteSchema.parse(input);
 
-    // 3. Verify note ownership
     const existingNote = await prisma.note.findUnique({
       where: { id: validated.id },
       select: { userId: true },
@@ -85,42 +160,89 @@ export async function updateNote(input: UpdateNoteInput) {
       return createErrorResult("Unauthorized");
     }
 
-    // 4. Update note (excluding tags - they're managed separately)
-    const { id, ...updateFields } = validated;
+    const note = await prisma.$transaction(
+      async (tx) => {
+        const { id, tags: newTags, ...updateFields } = validated;
 
-    // Transform the data to Prisma's expected format
-    const updateData = {
-      title: updateFields.title,
-      content: updateFields.content,
-      folderId:
-        updateFields.folderId === undefined
-          ? undefined
-          : updateFields.folderId ?? null,
-      isAutoOrganized: updateFields.isAutoOrganized,
-      aiSuggestions:
-        updateFields.aiSuggestions === undefined
-          ? undefined
-          : updateFields.aiSuggestions ?? Prisma.JsonNull,
-    };
+        const updateData = {
+          title: updateFields.title,
+          content: updateFields.content,
+          folderId:
+            updateFields.folderId === undefined
+              ? undefined
+              : updateFields.folderId ?? null,
+          isAutoOrganized: updateFields.isAutoOrganized,
+          aiSuggestions:
+            updateFields.aiSuggestions === undefined
+              ? undefined
+              : updateFields.aiSuggestions ?? Prisma.JsonNull,
+        };
 
-    const note = await prisma.note.update({
-      where: { id },
-      data: updateData,
-      include: {
-        folder: true,
-        tags: {
+        const updatedNote = await tx.note.update({
+          where: { id },
+          data: updateData,
+        });
+
+        // Handle tags if provided
+        if (newTags !== undefined) {
+          // Remove all existing tag connections
+          await tx.noteTag.deleteMany({
+            where: { noteId: id },
+          });
+
+          // Add new tags - PARALLEL PROCESSING
+          if (newTags.length > 0) {
+            // ✅ FIX: Process all tags in parallel
+            await Promise.all(
+              newTags.map(async (tagName) => {
+                const tag = await tx.tag.upsert({
+                  where: {
+                    userId_name: {
+                      userId,
+                      name: tagName,
+                    },
+                  },
+                  create: {
+                    name: tagName,
+                    userId,
+                  },
+                  update: {},
+                });
+
+                await tx.noteTag.create({
+                  data: {
+                    noteId: id,
+                    tagId: tag.id,
+                  },
+                });
+              })
+            );
+          }
+        }
+
+        return await tx.note.findUnique({
+          where: { id },
           include: {
-            tag: true,
+            folder: true,
+            tags: {
+              include: {
+                tag: true,
+              },
+            },
           },
-        },
+        });
       },
-    });
+      {
+        maxWait: 10000, // ✅ Increase max wait time
+        timeout: 15000, // ✅ Increase timeout
+      }
+    );
 
-    // 5. Revalidate cache
     revalidatePath("/");
 
     return createSuccessResult(note, "Note updated successfully");
   } catch (error) {
+    console.error("❌ [Update Note] Error:", error);
     logger.error("Error updating note:", { error });
     return createErrorResult({ error });
   }
@@ -149,14 +271,14 @@ export async function deleteNote(noteId: string) {
     }
 
     // 3. Delete note (NoteTag junction table rows cascade automatically)
-    await prisma.note.delete({
+    const deletedNote = await prisma.note.delete({
       where: { id: noteId },
     });
 
     // 4. Revalidate cache
     revalidatePath("/");
 
-    return createSuccessResult(null, "Note deleted successfully");
+    return createSuccessResult(deletedNote, "Note deleted successfully");
   } catch (error) {
     logger.error("Error deleting note:", { error });
     return createErrorResult({ error });

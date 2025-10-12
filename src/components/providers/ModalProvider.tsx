@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { QuickCaptureModal } from "@/components/modals/QuickCaptureModal";
 import { FolderModal } from "@/components/modals/FolderModal";
+import { SearchModal } from "../modals/SearchModal";
 
 /**
  * ModalProvider Component
@@ -41,6 +42,7 @@ export const ModalProvider = () => {
     <>
       <QuickCaptureModal />
       <FolderModal />
+      <SearchModal />
     </>
   );
 };

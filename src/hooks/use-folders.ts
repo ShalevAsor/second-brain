@@ -13,12 +13,8 @@ import {
 } from "@/schemas/folderSchemas";
 import type { FolderWithRelations } from "@/types/folderTypes";
 import { toast } from "sonner";
-
-/**
- * Query key for folders
- * Centralized to ensure consistency across the app
- */
-export const FOLDERS_QUERY_KEY = ["folders"] as const;
+import { FOLDERS_QUERY_KEY, NOTES_QUERY_KEY } from "@/lib/query-keys";
+import { useRouter } from "next/navigation";
 
 /**
  * Hook to fetch all folders for the authenticated user
@@ -37,7 +33,7 @@ export const FOLDERS_QUERY_KEY = ["folders"] as const;
  * ```
  */
 
-export function useFolders() {
+export function useFolders(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: FOLDERS_QUERY_KEY,
     queryFn: async () => {
@@ -47,6 +43,7 @@ export function useFolders() {
       }
       return result.data as FolderWithRelations[];
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -226,9 +223,11 @@ export function useUpdateFolder() {
       toast.error(error.message || "Failed to update folder");
     },
 
-    // Always refetch to ensure correct data
     onSettled: () => {
+      // - folders: Folder name/color/parent changed (sidebar updates)
+      // - notes: Note cards display folder name/color (must refresh if folder changed)
       queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
     },
 
     onSuccess: () => {
@@ -258,7 +257,7 @@ export function useUpdateFolder() {
  */
 export function useDeleteFolder() {
   const queryClient = useQueryClient();
-
+  const router = useRouter();
   return useMutation({
     mutationFn: async (input: DeleteFolderInput) => {
       const result = await deleteFolder(input);
@@ -301,12 +300,17 @@ export function useDeleteFolder() {
     },
 
     // Always refetch to ensure correct data
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
-    },
-
     onSuccess: () => {
       toast.success("Folder deleted successfully");
+
+      router.push("/notes");
+    },
+    onSettled: () => {
+      // Why invalidate both?
+      // - folders: Folder removed from sidebar (including children via cascade)
+      // - notes: Notes in deleted folder now orphaned (folderId: null), must refresh to show "No folder"
+      queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
     },
   });
 }

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useFolders } from "@/hooks/use-folders";
 import { Loader2 } from "lucide-react";
 import type { FolderOption } from "@/types/folderTypes";
-
+import { buildHierarchicalFolders } from "@/lib/folderHelpers";
 interface FolderSelectorProps {
   value: string | null;
   onChange: (folderId: string | null) => void;
@@ -29,19 +29,6 @@ interface FolderSelectorProps {
   noneOptionLabel?: string; // Custom label for "None"
   required?: boolean; // Show asterisk on label
   className?: string;
-}
-
-/**
- * Build hierarchical folder list with proper sorting
- * Uses the depth field from database (no calculation needed!)
- */
-function buildHierarchicalFolders(folders: FolderOption[]): FolderOption[] {
-  return [...folders].sort((a, b) => {
-    // Sort by depth first (0, 1, 2)
-    if (a.depth !== b.depth) return a.depth - b.depth;
-    // Then alphabetically within same depth
-    return a.name.localeCompare(b.name);
-  });
 }
 
 /**
