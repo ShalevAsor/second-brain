@@ -20,6 +20,7 @@ import {
   TAGS_QUERY_KEY,
   FAVORITES_QUERY_KEY,
   noteKeys,
+  SEMANTIC_SEARCH_QUERY_KEY,
 } from "@/lib/query-keys";
 
 /**
@@ -145,6 +146,9 @@ export function useCreateNote() {
           isFavorite: false,
           aiSuggestions: newNote.aiSuggestions ?? null,
           userId: "temp-user",
+          embedding: [],
+          embeddingUpdatedAt: new Date(),
+          contentUpdatedAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -167,6 +171,8 @@ export function useCreateNote() {
       queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: SEMANTIC_SEARCH_QUERY_KEY });
+
       if (data?.isFavorite) {
         queryClient.invalidateQueries({ queryKey: FAVORITES_QUERY_KEY });
       }
@@ -248,7 +254,7 @@ export function useUpdateNote() {
       // toast.success("Note updated");
     },
 
-    onSettled: (data) => {
+    onSettled: () => {
       // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
       // - notes: Note content/metadata changed
@@ -259,6 +265,7 @@ export function useUpdateNote() {
       queryClient.invalidateQueries({ queryKey: TAGS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: FAVORITES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: SEMANTIC_SEARCH_QUERY_KEY });
     },
   });
 }

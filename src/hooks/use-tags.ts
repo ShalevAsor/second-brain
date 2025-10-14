@@ -7,7 +7,6 @@ import {
   deleteTag,
   addTagToNote,
   removeTagFromNote,
-  getNotesByTag,
   type TagWithCount,
 } from "@/actions/tagActions";
 import type {

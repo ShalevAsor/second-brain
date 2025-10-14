@@ -5,10 +5,10 @@
  * Analyzes user content and returns structured organization suggestions.
  */
 
-import { getOpenAIClient } from "./openai-client";
-import { buildContentAnalysisPrompt } from "./prompts";
-import { ContentAnalysisResult, AIServiceError } from "./types";
+import { getOpenAIClient } from "./core/openai-client";
+import { ContentAnalysisResult, AIServiceError } from "./core/types";
 import type { FolderOption } from "@/types/folderTypes";
+import { buildAnalysisPrompt } from "./prompts";
 
 /**
  * Analyze content and generate organization suggestions
@@ -34,7 +34,7 @@ export async function analyzeContent(
     const client = getOpenAIClient();
 
     // Build prompt with user's folder and tag context
-    const { system, user } = buildContentAnalysisPrompt(
+    const { system, user } = buildAnalysisPrompt(
       content,
       userFolders,
       userTags

@@ -404,6 +404,7 @@ import {
   MathInlineButton,
 } from "@/components/tiptap-ui/math-inline-popover";
 import { MathBlockPopover } from "@/components/tiptap-ui/math-block-popover";
+import { FormatContentButton } from "@/components/tiptap-ui/format-content-button";
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon";
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon";
@@ -456,6 +457,12 @@ const MainToolbarContent = ({
       <ToolbarGroup data-priority="critical">
         <UndoRedoButton action="undo" />
         <UndoRedoButton action="redo" />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup data-priority="high">
+        <FormatContentButton text="Format" />
       </ToolbarGroup>
 
       <ToolbarSeparator />

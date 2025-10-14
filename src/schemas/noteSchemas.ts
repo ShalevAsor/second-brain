@@ -9,8 +9,6 @@ export const createNoteSchema = z.object({
   folderId: z.cuid("Invalid folder ID format").nullish(),
   // boolean with default
   isAutoOrganized: z.boolean().default(false),
-  // aiSuggestions can be null or undefined (JSON field in Prisma)
-  aiSuggestions: z.record(z.string(), z.any()).nullable().optional(),
   tags: z
     .array(
       z
@@ -35,7 +33,6 @@ export const updateNoteSchema = z.object({
   content: z.string().min(1, "Content cannot be empty").optional(),
   folderId: z.cuid("Invalid folder ID format").nullish(),
   isAutoOrganized: z.boolean().optional(),
-  aiSuggestions: z.record(z.string(), z.any()).nullable().optional(),
   tags: z
     .array(
       z

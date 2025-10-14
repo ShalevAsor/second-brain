@@ -41,8 +41,8 @@ export async function createNote(input: CreateNoteInput) {
             content: validated.content,
             folderId: validated.folderId ?? null,
             isAutoOrganized: validated.isAutoOrganized ?? false,
-            aiSuggestions: validated.aiSuggestions ?? Prisma.JsonNull,
             userId,
+            contentUpdatedAt: new Date(),
           },
         });
 
@@ -146,55 +146,66 @@ export async function updateNote(input: UpdateNoteInput) {
   try {
     const userId = await requireAuth();
     const validated = updateNoteSchema.parse(input);
-
-    const existingNote = await prisma.note.findUnique({
-      where: { id: validated.id },
-      select: { userId: true },
-    });
-
-    if (!existingNote) {
-      return createErrorResult("Note not found");
-    }
-
-    if (existingNote.userId !== userId) {
-      return createErrorResult("Unauthorized");
-    }
+    const { id, tags, ...updateData } = validated;
 
     const note = await prisma.$transaction(
       async (tx) => {
-        const { id, tags: newTags, ...updateFields } = validated;
-
-        const updateData = {
-          title: updateFields.title,
-          content: updateFields.content,
-          folderId:
-            updateFields.folderId === undefined
-              ? undefined
-              : updateFields.folderId ?? null,
-          isAutoOrganized: updateFields.isAutoOrganized,
-          aiSuggestions:
-            updateFields.aiSuggestions === undefined
-              ? undefined
-              : updateFields.aiSuggestions ?? Prisma.JsonNull,
-        };
-
-        const updatedNote = await tx.note.update({
+        // 1. Fetch existing note (we need it for comparison and auth check)
+        const existingNote = await tx.note.findUnique({
           where: { id },
-          data: updateData,
+          select: {
+            userId: true,
+            title: true,
+            content: true,
+          },
         });
 
-        // Handle tags if provided
-        if (newTags !== undefined) {
+        if (!existingNote) {
+          throw new Error("Note not found");
+        }
+
+        if (existingNote.userId !== userId) {
+          throw new Error("Unauthorized");
+        }
+
+        // 2. Check if content changed
+        const titleChanged =
+          updateData.title !== undefined &&
+          updateData.title !== existingNote.title;
+
+        const contentChanged =
+          updateData.content !== undefined &&
+          updateData.content !== existingNote.content;
+
+        const isContentUpdate = titleChanged || contentChanged;
+
+        // 3. Update note
+        await tx.note.update({
+          where: { id },
+          data: {
+            title: updateData.title,
+            content: updateData.content,
+            folderId:
+              updateData.folderId === undefined
+                ? undefined
+                : updateData.folderId ?? null,
+            isAutoOrganized: updateData.isAutoOrganized,
+            //  Conditionally update contentUpdatedAt
+            ...(isContentUpdate && { contentUpdatedAt: new Date() }),
+          },
+        });
+
+        // 4. Handle tags if provided
+        if (tags !== undefined) {
           // Remove all existing tag connections
           await tx.noteTag.deleteMany({
             where: { noteId: id },
           });
 
           // Add new tags - PARALLEL PROCESSING
-          if (newTags.length > 0) {
-            // ✅ FIX: Process all tags in parallel
+          if (tags.length > 0) {
             await Promise.all(
-              newTags.map(async (tagName) => {
+              tags.map(async (tagName) => {
                 const tag = await tx.tag.upsert({
                   where: {
                     userId_name: {
@@ -220,6 +231,7 @@ export async function updateNote(input: UpdateNoteInput) {
           }
         }
 
+        // 5. Return updated note with relations
         return await tx.note.findUnique({
           where: { id },
           include: {
@@ -233,13 +245,12 @@ export async function updateNote(input: UpdateNoteInput) {
         });
       },
       {
-        maxWait: 10000, // ✅ Increase max wait time
-        timeout: 15000, // ✅ Increase timeout
+        maxWait: 10000,
+        timeout: 15000,
       }
     );
 
     revalidatePath("/");
-
     return createSuccessResult(note, "Note updated successfully");
   } catch (error) {
     console.error("❌ [Update Note] Error:", error);

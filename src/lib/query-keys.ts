@@ -15,7 +15,7 @@ export const NOTES_QUERY_KEY = ["notes"] as const;
 export const FOLDERS_QUERY_KEY = ["folders"] as const;
 export const TAGS_QUERY_KEY = ["tags"] as const;
 export const FAVORITES_QUERY_KEY = ["favorites"] as const;
-
+export const SEMANTIC_SEARCH_QUERY_KEY = ["semantic-search"] as const;
 // =================================================================
 // QUERY KEY FACTORIES (for specific queries)
 // ==================================================================
@@ -54,45 +54,25 @@ export const tagKeys = {
   detail: (tagId: string) => ["tags", tagId] as const,
 } as const;
 
-// ==============================================================
-// HELPER: INVALIDATE MULTIPLE KEYS
-// ===============================================================
-
 /**
- * Helper type for query client invalidation
- * Usage: await invalidateMultiple(queryClient, [NOTES_QUERY_KEY, TAGS_QUERY_KEY])
+ * Semantic search query keys
+ * Use these for AI-powered search queries
  */
-export type QueryKey = readonly string[] | readonly unknown[];
+export const semanticSearchKeys = {
+  // Base key (for invalidating all semantic searches)
+  all: () => SEMANTIC_SEARCH_QUERY_KEY,
 
-/**
- * Common invalidation patterns for mutations
- * Use these to ensure consistency
- */
-export const invalidationGroups = {
-  // When notes are created/updated/deleted
-  notes: [NOTES_QUERY_KEY] as const,
+  // Search results with specific query and filters
+  search: (
+    query: string,
+    options?: {
+      minSimilarity?: number;
+      maxResults?: number;
+      folderId?: string | null;
+      tagIds?: string[];
+    }
+  ) => ["semantic-search", "results", query, options] as const,
 
-  // When note content changes (affects tags/folders/favorites)
-  noteWithRelations: [
-    NOTES_QUERY_KEY,
-    TAGS_QUERY_KEY,
-    FOLDERS_QUERY_KEY,
-  ] as const,
-
-  // When note is deleted (affects everything)
-  noteDelete: [
-    NOTES_QUERY_KEY,
-    TAGS_QUERY_KEY,
-    FOLDERS_QUERY_KEY,
-    FAVORITES_QUERY_KEY,
-  ] as const,
-
-  // When folders change (affects notes that display folder names)
-  folders: [FOLDERS_QUERY_KEY, NOTES_QUERY_KEY] as const,
-
-  // When tags change (affects notes that display tag names)
-  tags: [TAGS_QUERY_KEY, NOTES_QUERY_KEY] as const,
-
-  // When favorites change
-  favorites: [FAVORITES_QUERY_KEY, NOTES_QUERY_KEY] as const,
+  // Embedding status
+  status: () => ["semantic-search", "status"] as const,
 } as const;

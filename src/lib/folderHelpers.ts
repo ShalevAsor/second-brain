@@ -65,3 +65,74 @@ export function formatFoldersForAI(folders: FolderOption[]): string {
 
   return result.join("\n");
 }
+
+/**
+ * Build full path for a folder (e.g., "Algorithms/Sorting")
+ *
+ * Recursively builds path by traversing parent hierarchy.
+ *
+ * @param folder - Folder to build path for
+ * @param allFolders - All folders (needed to find parents)
+ * @returns Full path string (e.g., "Parent/Child")
+ *
+ * @example
+ * // Folder: { name: "Sorting", parentId: "1" }
+ * // Parent: { id: "1", name: "Algorithms", parentId: null }
+ * // Result: "Algorithms/Sorting"
+ */
+export function buildFolderPath(
+  folder: FolderOption,
+  allFolders: FolderOption[]
+): string {
+  if (!folder.parentId) {
+    return folder.name; // Root folder
+  }
+
+  // Find parent and recursively build path
+  const parent = allFolders.find((f) => f.id === folder.parentId);
+  if (!parent) {
+    return folder.name; // Parent not found (shouldn't happen)
+  }
+
+  return `${buildFolderPath(parent, allFolders)}/${folder.name}`;
+}
+
+/**
+ * Find folder by exact path match (e.g., "Algorithms/Sorting")
+ *
+ * Case-insensitive matching. Prefers most specific (deepest) match.
+ *
+ * @param folderPath - Path suggested by AI (e.g., "Algorithms/Sorting" or "Algorithms")
+ * @param folders - All user folders
+ * @returns Matched folder or null
+ *
+ * @example
+ * // User has: "Algorithms" (root), "Sorting" (child of Algorithms)
+ * findFolderByPath("Algorithms/Sorting", folders)
+ * // Returns: { id: "2", name: "Sorting", parentId: "1", depth: 1 }
+ *
+ * findFolderByPath("Algorithms", folders)
+ * // Returns: { id: "1", name: "Algorithms", parentId: null, depth: 0 }
+ */
+export function findFolderByPath(
+  folderPath: string,
+  folders: FolderOption[]
+): FolderOption | null {
+  if (!folderPath || folders.length === 0) return null;
+
+  const normalizedPath = folderPath.toLowerCase().trim();
+
+  // Build paths for all folders and find matches
+  const matches = folders
+    .map((folder) => ({
+      folder,
+      path: buildFolderPath(folder, folders).toLowerCase(),
+    }))
+    .filter(({ path }) => path === normalizedPath);
+
+  if (matches.length === 0) return null;
+
+  // If multiple matches (shouldn't happen), return deepest one
+  matches.sort((a, b) => b.folder.depth - a.folder.depth);
+  return matches[0].folder;
+}
