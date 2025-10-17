@@ -12,6 +12,7 @@
 // };
 
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
@@ -20,6 +21,11 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
+  // Redirect home page to /notes
+  if (req.nextUrl.pathname === "/") {
+    return NextResponse.redirect(new URL("/notes", req.url));
+  }
+
   if (!isPublicRoute(req)) {
     await auth.protect();
   }
