@@ -14,7 +14,6 @@ import { createSuccessResult, createErrorResult } from "@/lib/actionHelpers";
 import { requireAuth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { ActionResult } from "@/types/actionTypes";
 
 /**

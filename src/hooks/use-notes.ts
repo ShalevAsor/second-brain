@@ -144,7 +144,6 @@ export function useCreateNote() {
           tags: [],
           isAutoOrganized: newNote.isAutoOrganized ?? false,
           isFavorite: false,
-          aiSuggestions: newNote.aiSuggestions ?? null,
           userId: "temp-user",
           embedding: [],
           embeddingUpdatedAt: new Date(),
