@@ -14,9 +14,6 @@ export function QuickCapture() {
         <p className="text-sm text-muted-foreground">
           Paste anything here and AI will auto-organize it in 5 seconds
         </p>
-        <p className="text-xs text-muted-foreground/75">
-          (Coming soon - placeholder for now)
-        </p>
       </div>
     </div>
   );
